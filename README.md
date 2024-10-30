@@ -10,6 +10,6 @@ A simple command-line tool to generate RSA key pairs and JWK (JSON Web Key) file
 ## How to run it? 📦
 
 ```bash
+go mod tidy
 go run main.go
 ```
-# private-key-generator
