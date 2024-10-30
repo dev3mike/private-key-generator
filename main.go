@@ -44,6 +44,11 @@ func generateKeyID(publicKey *rsa.PublicKey) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(hasher.Sum(nil)), nil
 }
 
+func writeBase64File(path string, content []byte) error {
+	encoded := base64.StdEncoding.EncodeToString(content)
+	return os.WriteFile(path, []byte(encoded), 0644)
+}
+
 func main() {
 	// Parse command line flags
 	keySize := flag.Int("size", defaultKeySize, "RSA key size in bits (2048 or 4096 recommended)")
@@ -77,17 +82,19 @@ func main() {
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
 	}
+	privateKeyPEMBytes := pem.EncodeToMemory(privateKeyPEM)
 
-	// Write private key to file
+	// Write private key to PEM file
 	privateKeyPath := filepath.Join(*outDir, "private_key.pem")
-	privateKeyFile, err := os.OpenFile(privateKeyPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		log.Fatalf("Failed to create private key file: %v", err)
-	}
-	defer privateKeyFile.Close()
-
-	if err := pem.Encode(privateKeyFile, privateKeyPEM); err != nil {
+	if err := os.WriteFile(privateKeyPath, privateKeyPEMBytes, 0600); err != nil {
 		log.Fatalf("Failed to write private key: %v", err)
+	}
+
+	// Write base64 version of PEM to file
+	base64Content := base64.StdEncoding.EncodeToString(privateKeyPEMBytes)
+	base64Path := filepath.Join(*outDir, "base64.txt")
+	if err := os.WriteFile(base64Path, []byte(base64Content), 0600); err != nil {
+		log.Fatalf("Failed to write base64 file: %v", err)
 	}
 
 	// Create JWK
@@ -104,21 +111,23 @@ func main() {
 		Keys: []JWK{jwk},
 	}
 
-	// Write JWK to file
-	jwkPath := filepath.Join(*outDir, "jwks.json")
-	jwkFile, err := os.OpenFile(jwkPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	// Marshal JWK to JSON
+	jwkBytes, err := json.MarshalIndent(jwkSet, "", "  ")
 	if err != nil {
-		log.Fatalf("Failed to create JWK file: %v", err)
+		log.Fatalf("Failed to marshal JWK: %v", err)
 	}
-	defer jwkFile.Close()
 
-	encoder := json.NewEncoder(jwkFile)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(jwkSet); err != nil {
+	// Write JWK to JSON file
+	jwkPath := filepath.Join(*outDir, "jwks.json")
+	if err := os.WriteFile(jwkPath, jwkBytes, 0644); err != nil {
 		log.Fatalf("Failed to write JWK: %v", err)
 	}
 
 	fmt.Printf("Successfully generated files:\n")
-	fmt.Printf("Private key: %s\n", privateKeyPath)
-	fmt.Printf("JWK Set: %s\n", jwkPath)
+	fmt.Printf("Private key (PEM): %s\n", privateKeyPath)
+	fmt.Printf("Private key (Base64): %s\n", base64Path)
+	fmt.Printf("JWK Set (JSON): %s\n", jwkPath)
+
+	// Print base64 content to console
+	fmt.Printf("\nBase64 encoded PEM:\n%s\n", base64Content)
 }
