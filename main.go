@@ -44,11 +44,6 @@ func generateKeyID(publicKey *rsa.PublicKey) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(hasher.Sum(nil)), nil
 }
 
-func writeBase64File(path string, content []byte) error {
-	encoded := base64.StdEncoding.EncodeToString(content)
-	return os.WriteFile(path, []byte(encoded), 0644)
-}
-
 func main() {
 	// Parse command line flags
 	keySize := flag.Int("size", defaultKeySize, "RSA key size in bits (2048 or 4096 recommended)")
